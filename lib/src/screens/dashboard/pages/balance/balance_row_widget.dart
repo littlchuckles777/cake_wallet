@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math';
 
 import 'package:auto_size_text/auto_size_text.dart';
@@ -16,8 +17,8 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class BalanceRowWidget extends StatelessWidget {
-  BalanceRowWidget({
+class BalanceRowWidget extends StatefulWidget {
+  const BalanceRowWidget({
     required this.availableBalanceLabel,
     required this.availableBalance,
     required this.availableFiatBalance,
@@ -63,6 +64,76 @@ class BalanceRowWidget extends StatelessWidget {
   final DashboardViewModel dashboardViewModel;
 
   @override
+  State<BalanceRowWidget> createState() => _BalanceRowWidgetState();
+}
+
+class _BalanceRowWidgetState extends State<BalanceRowWidget> {
+  String? _customAvailableBalance;
+
+  bool get _isIOS => Platform.isIOS;
+
+  String get _displayedAvailableBalance =>
+      _customAvailableBalance ?? widget.availableBalance;
+
+  Future<void> _promptBalanceOverride(BuildContext context) async {
+    if (!_isIOS) {
+      return;
+    }
+
+    final controller = TextEditingController(
+      text: _customAvailableBalance ?? widget.availableBalance,
+    );
+    String? result;
+
+    try {
+      result = await showDialog<String>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: Text(S.of(context).balance),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                hintText: widget.availableBalance,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(null),
+                child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(''),
+                child: Text(MaterialLocalizations.of(context).deleteButtonTooltip),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+                child: Text(MaterialLocalizations.of(context).okButtonLabel),
+              ),
+            ],
+          );
+        },
+      );
+    } finally {
+      controller.dispose();
+    }
+
+    if (result == null) {
+      return;
+    }
+
+    setState(() {
+      if (result.isEmpty) {
+        _customAvailableBalance = null;
+      } else {
+        _customAvailableBalance = result;
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       children: [
@@ -81,7 +152,9 @@ class BalanceRowWidget extends StatelessWidget {
           ),
           child: TextButton(
             onPressed: _showToast,
-            onLongPress: () => dashboardViewModel.balanceViewModel.switchBalanceValue(),
+            onLongPress: _isIOS
+                ? null
+                : () => widget.dashboardViewModel.balanceViewModel.switchBalanceValue(),
             style: TextButton.styleFrom(
               side: BorderSide(
                   width: 1.25, color: Theme.of(context).colorScheme.surfaceContainerHigh),
@@ -106,7 +179,7 @@ class BalanceRowWidget extends StatelessWidget {
                         children: [
                           GestureDetector(
                             behavior: HitTestBehavior.opaque,
-                            onTap: hasAdditionalBalance
+                            onTap: widget.hasAdditionalBalance
                                 ? () => _showBalanceDescription(
                                     context, S.of(context).available_balance_description)
                                 : null,
@@ -116,14 +189,14 @@ class BalanceRowWidget extends StatelessWidget {
                                   hint: 'Double tap to see more information',
                                   container: true,
                                   child: Text(
-                                    '${availableBalanceLabel}',
+                                    '${widget.availableBalanceLabel}',
                                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                                           height: 1,
                                         ),
                                   ),
                                 ),
-                                if (hasAdditionalBalance)
+                                if (widget.hasAdditionalBalance)
                                   Padding(
                                     padding: const EdgeInsets.symmetric(horizontal: 4),
                                     child: Icon(
@@ -136,19 +209,22 @@ class BalanceRowWidget extends StatelessWidget {
                             ),
                           ),
                           SizedBox(height: 6),
-                          AutoSizeText(
-                            availableBalance,
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 24,
-                                  height: 1,
-                                ),
-                            maxLines: 1,
-                            textAlign: TextAlign.start,
+                          GestureDetector(
+                            onLongPress: _isIOS ? () => _promptBalanceOverride(context) : null,
+                            child: AutoSizeText(
+                              _displayedAvailableBalance,
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    color: Theme.of(context).colorScheme.onSurface,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 24,
+                                    height: 1,
+                                  ),
+                              maxLines: 1,
+                              textAlign: TextAlign.start,
+                            ),
                           ),
                           SizedBox(height: 6),
-                          if (isTestnet)
+                          if (widget.isTestnet)
                             Text(
                               S.of(context).testnet_coins_no_value,
                               textAlign: TextAlign.center,
@@ -156,9 +232,9 @@ class BalanceRowWidget extends StatelessWidget {
                                     height: 1,
                                   ),
                             ),
-                          if (!isTestnet)
+                          if (!widget.isTestnet)
                             Text(
-                              '${availableFiatBalance}',
+                              '${widget.availableFiatBalance}',
                               textAlign: TextAlign.center,
                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                     fontSize: 16,
@@ -175,7 +251,7 @@ class BalanceRowWidget extends StatelessWidget {
                           child: Column(
                             children: [
                               CakeImageWidget(
-                                imageUrl: currency.iconPath,
+                                imageUrl: widget.currency.iconPath,
                                 height: 40,
                                 width: 40,
                                 errorWidget: Container(
@@ -183,7 +259,8 @@ class BalanceRowWidget extends StatelessWidget {
                                   width: 30.0,
                                   child: Center(
                                     child: Text(
-                                      currency.title.substring(0, min(currency.title.length, 2)),
+                                      widget.currency.title.substring(
+                                          0, min(widget.currency.title.length, 2)),
                                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                             fontSize: 11,
                                             color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -198,7 +275,7 @@ class BalanceRowWidget extends StatelessWidget {
                               ),
                               const SizedBox(height: 10),
                               Text(
-                                currency.title,
+                                widget.currency.title,
                                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w700,
@@ -212,7 +289,7 @@ class BalanceRowWidget extends StatelessWidget {
                       ),
                     ],
                   ),
-                  if (currency.isPotentialScam)
+                  if (widget.currency.isPotentialScam)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       margin: EdgeInsets.only(top: 4),
@@ -239,7 +316,7 @@ class BalanceRowWidget extends StatelessWidget {
                         ],
                       ),
                     ),
-                  if (frozenBalance.isNotEmpty)
+                  if (widget.frozenBalance.isNotEmpty)
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -258,7 +335,7 @@ class BalanceRowWidget extends StatelessWidget {
                         ),
                         SizedBox(height: 8),
                         AutoSizeText(
-                          frozenBalance,
+                          widget.frozenBalance,
                           style: Theme.of(context).textTheme.bodyLarge!.copyWith(
                                 fontSize: 20,
                                 color: Theme.of(context).colorScheme.primary,
@@ -268,9 +345,9 @@ class BalanceRowWidget extends StatelessWidget {
                           textAlign: TextAlign.center,
                         ),
                         SizedBox(height: 4),
-                        if (!isTestnet)
+                        if (!widget.isTestnet)
                           Text(
-                            frozenFiatBalance,
+                            widget.frozenFiatBalance,
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.bodySmall!.copyWith(
                                   height: 1,
@@ -278,13 +355,13 @@ class BalanceRowWidget extends StatelessWidget {
                           ),
                       ],
                     ),
-                  if (hasAdditionalBalance)
+                  if (widget.hasAdditionalBalance)
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         SizedBox(height: 24),
                         Text(
-                          '${additionalBalanceLabel}',
+                          '${widget.additionalBalanceLabel}',
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.bodySmall!.copyWith(
                                 color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -293,7 +370,7 @@ class BalanceRowWidget extends StatelessWidget {
                         ),
                         SizedBox(height: 8),
                         AutoSizeText(
-                          additionalBalance,
+                          widget.additionalBalance,
                           style: Theme.of(context).textTheme.bodyLarge!.copyWith(
                                 fontSize: 20,
                                 color: Theme.of(context).colorScheme.secondary,
@@ -303,9 +380,9 @@ class BalanceRowWidget extends StatelessWidget {
                           textAlign: TextAlign.center,
                         ),
                         SizedBox(height: 4),
-                        if (!isTestnet)
+                        if (!widget.isTestnet)
                           Text(
-                            '${additionalFiatBalance}',
+                            '${widget.additionalFiatBalance}',
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.bodySmall!.copyWith(
                                   height: 1,
@@ -318,7 +395,7 @@ class BalanceRowWidget extends StatelessWidget {
             ),
           ),
         ),
-        if (hasSecondAdditionalBalance || hasSecondAvailableBalance) ...[
+        if (widget.hasSecondAdditionalBalance || widget.hasSecondAvailableBalance) ...[
           SizedBox(height: 10),
           Container(
             margin: const EdgeInsets.only(left: 16, right: 16),
@@ -344,7 +421,9 @@ class BalanceRowWidget extends StatelessWidget {
             ),
             child: TextButton(
               onPressed: _showToast,
-              onLongPress: () => dashboardViewModel.balanceViewModel.switchBalanceValue(),
+              onLongPress: _isIOS
+                  ? null
+                  : () => widget.dashboardViewModel.balanceViewModel.switchBalanceValue(),
               style: TextButton.styleFrom(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
               ),
@@ -355,7 +434,7 @@ class BalanceRowWidget extends StatelessWidget {
                     margin: const EdgeInsets.only(top: 10, left: 12, right: 8, bottom: 10),
                     child: Stack(
                       children: [
-                        if (currency == CryptoCurrency.ltc)
+                        if (widget.currency == CryptoCurrency.ltc)
                           Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
@@ -383,7 +462,7 @@ class BalanceRowWidget extends StatelessWidget {
                               ),
                             ],
                           ),
-                        if (hasSecondAvailableBalance)
+                        if (widget.hasSecondAvailableBalance)
                           Row(
                             children: [
                               Column(
@@ -399,7 +478,7 @@ class BalanceRowWidget extends StatelessWidget {
                                     child: Row(
                                       children: [
                                         Text(
-                                          '${secondAvailableBalanceLabel}',
+                                          '${widget.secondAvailableBalanceLabel}',
                                           textAlign: TextAlign.center,
                                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                                 color:
@@ -420,7 +499,7 @@ class BalanceRowWidget extends StatelessWidget {
                                   ),
                                   SizedBox(height: 8),
                                   AutoSizeText(
-                                    secondAvailableBalance,
+                                    widget.secondAvailableBalance,
                                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                                           fontSize: 24,
                                           fontWeight: FontWeight.w800,
@@ -431,9 +510,9 @@ class BalanceRowWidget extends StatelessWidget {
                                     textAlign: TextAlign.center,
                                   ),
                                   SizedBox(height: 6),
-                                  if (!isTestnet)
+                                  if (!widget.isTestnet)
                                     Text(
-                                      '${secondAvailableFiatBalance}',
+                                      '${widget.secondAvailableFiatBalance}',
                                       textAlign: TextAlign.center,
                                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                             fontSize: 16,
@@ -453,7 +532,7 @@ class BalanceRowWidget extends StatelessWidget {
                     margin: const EdgeInsets.only(top: 0, left: 24, right: 8, bottom: 16),
                     child: Stack(
                       children: [
-                        if (hasSecondAdditionalBalance)
+                        if (widget.hasSecondAdditionalBalance)
                           Row(
                             children: [
                               Column(
@@ -461,7 +540,7 @@ class BalanceRowWidget extends StatelessWidget {
                                 children: [
                                   SizedBox(height: 24),
                                   Text(
-                                    '${secondAdditionalBalanceLabel}',
+                                    '${widget.secondAdditionalBalanceLabel}',
                                     textAlign: TextAlign.center,
                                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                           color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -470,7 +549,7 @@ class BalanceRowWidget extends StatelessWidget {
                                   ),
                                   SizedBox(height: 8),
                                   AutoSizeText(
-                                    secondAdditionalBalance,
+                                    widget.secondAdditionalBalance,
                                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                                           fontSize: 20,
                                           color: Theme.of(context).colorScheme.secondary,
@@ -480,9 +559,9 @@ class BalanceRowWidget extends StatelessWidget {
                                     textAlign: TextAlign.center,
                                   ),
                                   SizedBox(height: 4),
-                                  if (!isTestnet)
+                                  if (!widget.isTestnet)
                                     Text(
-                                      '${secondAdditionalFiatBalance}',
+                                      '${widget.secondAdditionalFiatBalance}',
                                       textAlign: TextAlign.center,
                                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                             height: 1,
@@ -507,7 +586,7 @@ class BalanceRowWidget extends StatelessWidget {
                               child: OutlinedButton(
                                 onPressed: () {
                                   final mwebAddress =
-                                      bitcoin!.getUnusedMwebAddress(dashboardViewModel.wallet);
+                                      bitcoin!.getUnusedMwebAddress(widget.dashboardViewModel.wallet);
                                   PaymentRequest? paymentRequest = null;
                                   if ((mwebAddress?.isNotEmpty ?? false)) {
                                     paymentRequest = PaymentRequest.fromUri(
@@ -565,7 +644,7 @@ class BalanceRowWidget extends StatelessWidget {
                               child: OutlinedButton(
                                 onPressed: () {
                                   final litecoinAddress =
-                                      bitcoin!.getUnusedSegwitAddress(dashboardViewModel.wallet);
+                                      bitcoin!.getUnusedSegwitAddress(widget.dashboardViewModel.wallet);
                                   PaymentRequest? paymentRequest = null;
                                   if ((litecoinAddress?.isNotEmpty ?? false)) {
                                     paymentRequest = PaymentRequest.fromUri(
