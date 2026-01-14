@@ -121,6 +121,70 @@ More instructions to follow
 
 For instructions on how to build for Android: please view file `howto-build-android.md`
 
+## iOS: Installing on a Physical iPhone
+
+These steps install a debug build directly to an iPhone from macOS.
+
+### Prerequisites
+
+1. macOS with the latest Xcode installed (open Xcode once to install components).
+2. [Flutter](https://docs.flutter.dev/get-started/install/macos) installed and on your `PATH`.
+3. CocoaPods installed (`sudo gem install cocoapods` or `brew install cocoapods`).
+4. An Apple ID added to Xcode for code signing (Xcode > Settings > Accounts).
+5. A physical iPhone connected via USB (or paired for Wi‑Fi debugging).
+
+### Setup the project
+
+1. Fetch dependencies:
+   ```sh
+   flutter pub get
+   ```
+2. Install iOS pods:
+   ```sh
+   cd ios
+   pod install
+   cd ..
+   ```
+
+### Configure signing in Xcode
+
+1. Open the workspace:
+   ```sh
+   open ios/Runner.xcworkspace
+   ```
+2. Select the **Runner** target.
+3. Go to **Signing & Capabilities**:
+   - Enable **Automatically manage signing**.
+   - Choose your Team (Apple ID).
+   - If needed, update the Bundle Identifier to something unique (e.g. `com.yourname.cakewallet.dev`).
+
+### Build & run on the iPhone
+
+Option A — **Run from Xcode**:
+1. Select your connected iPhone from the device selector in Xcode.
+2. Click **Run** ▶️ to build and install.
+
+Option B — **Run from Flutter CLI**:
+1. List devices:
+   ```sh
+   flutter devices
+   ```
+2. Run on the iPhone:
+   ```sh
+   flutter run -d <device-id>
+   ```
+
+### Troubleshooting
+
+- If code signing fails, confirm your Team is selected and the Bundle ID is unique.
+- If pods are out of date, try:
+  ```sh
+  cd ios
+  pod repo update
+  pod install
+  cd ..
+  ```
+
 # Contributing
 
 ## Improving translations
